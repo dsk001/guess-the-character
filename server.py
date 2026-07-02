@@ -11,7 +11,7 @@ import http.cookiejar
 import time
 import os
 
-PORT = int(os.environ.get("PORT", 8000))
+PORT = 8000
 
 # Global room store
 # roomId -> room_data
@@ -107,8 +107,7 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "state": "lobby", # lobby, setup, playing, finished
                 "theme": "",
                 "assignmentMode": "random", # random, curated
-                "googleApiKey": "",
-                "googleCx": "",
+                "flippingMode": "tilt", # tilt, list
                 "players": {
                     host_id: {
                         "id": host_id,
@@ -256,6 +255,11 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
             mode = data.get("assignmentMode")
             if mode in ["random", "curated"]:
                 room["assignmentMode"] = mode
+            
+            flipping_mode = data.get("flippingMode")
+            if flipping_mode in ["tilt", "list"]:
+                room["flippingMode"] = flipping_mode
+                
             self.send_json_response(200, room)
             return
 
@@ -267,10 +271,6 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             theme = data.get("theme", "").strip() or "Any Character"
             room["theme"] = theme
-            
-            # Save Google Custom Search API credentials from Host config
-            room["googleApiKey"] = data.get("googleApiKey", "").strip()
-            room["googleCx"] = data.get("googleCx", "").strip()
             
             room["state"] = "setup"
             
@@ -402,6 +402,37 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                         room["state"] = "finished"
 
             self.send_json_response(200, room)
+            return
+
+        # 8b. LEAVE ROOM (Guest only)
+        if path == "/api/leave_room":
+            if player_id not in room["players"]:
+                self.send_json_response(401, {"error": "Player not in room"})
+                return
+            if player_id == room["hostId"]:
+                self.send_json_response(400, {"error": "Host cannot leave, they must end the room"})
+                return
+            
+            del room["players"][player_id]
+            if player_id in room["guessOrder"]:
+                room["guessOrder"].remove(player_id)
+                
+            # Check if game finishes as a result of player count change
+            if room["state"] in ["setup", "playing"]:
+                all_ready_or_done = all(
+                    p["status"] in ["ready", "guessed", "gave_up", "quit"]
+                    for p in room["players"].values()
+                )
+                if room["state"] == "setup" and all(p["status"] == "ready" for p in room["players"].values()):
+                    if room["assignmentMode"] == "random":
+                        self.assign_random_characters(room)
+                        room["state"] = "playing"
+                        for p in room["players"].values():
+                            p["status"] = "guessing"
+                elif room["state"] == "playing" and all_ready_or_done:
+                    room["state"] = "finished"
+                    
+            self.send_json_response(200, {"success": True})
             return
 
         # 9. RESET GAME (Host only)

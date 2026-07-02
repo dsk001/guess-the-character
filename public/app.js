@@ -13,12 +13,12 @@ const App = (() => {
     let players = {};
     let theme = "";
     let assignmentMode = "random"; // random, curated
+    let flippingMode = "tilt"; // tilt, list
     let selectedCharacter = null; // { name, image }
-    let googleApiKey = "";
-    let googleCx = "";
     
     // Polling and sensor state
     let pollInterval = null;
+    let isConnected = true;
     let deviceOrientationActive = false;
     let manualOverrideActive = false;
     let currentGameplayView = "back"; // default to "back" (options view)
@@ -60,10 +60,6 @@ const App = (() => {
         btnModeCurated: document.getElementById("btn-mode-curated"),
         modeDesc: document.getElementById("mode-desc"),
         themeInput: document.getElementById("theme-input"),
-        btnToggleApiSettings: document.getElementById("btn-toggle-api-settings"),
-        apiSettingsPanel: document.getElementById("api-settings-panel"),
-        googleApiKeyInput: document.getElementById("google-api-key"),
-        googleCxInput: document.getElementById("google-cx"),
         btnStartGame: document.getElementById("btn-start-game"),
         btnJoinInstead: document.getElementById("btn-join-instead"),
         btnEndRoom: document.getElementById("btn-end-room"),
@@ -195,9 +191,21 @@ const App = (() => {
             playerId = storedPlayerId;
             playerName = storedPlayerName;
             
+            setConnectedState(true);
+
             // Resume polling
             startPolling();
         }
+
+        // Handle page visibility change (wake up polling)
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                if (roomId && playerId) {
+                    poll();
+                    startPolling();
+                }
+            }
+        });
     }
 
     // ==========================================================================
@@ -248,16 +256,6 @@ const App = (() => {
             el.qrModal.style.display = "none";
         });
         
-        el.btnToggleApiSettings.addEventListener("click", () => {
-            AudioEffects.playClick();
-            const panel = el.apiSettingsPanel;
-            if (panel.style.display === "none" || !panel.style.display) {
-                panel.style.display = "flex";
-            } else {
-                panel.style.display = "none";
-            }
-        });
-
         el.btnStartGame.addEventListener("click", () => {
             AudioEffects.playClick();
             startGame();
@@ -353,6 +351,115 @@ const App = (() => {
             AudioEffects.playClick();
             endRoom();
         });
+
+        // Bind guest leave buttons (lobby, setup, gameplay)
+        const bindLeaveButton = (id) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener("click", () => {
+                    AudioEffects.playClick();
+                    leaveRoom();
+                });
+            }
+        };
+        bindLeaveButton("btn-leave-lobby");
+        bindLeaveButton("btn-leave-setup");
+        
+        // Setup screen host controls
+        const btnResetSetup = document.getElementById("btn-reset-setup");
+        if (btnResetSetup) {
+            btnResetSetup.addEventListener("click", () => {
+                AudioEffects.playClick();
+                resetGame();
+            });
+        }
+        const btnEndSetup = document.getElementById("btn-end-setup");
+        if (btnEndSetup) {
+            btnEndSetup.addEventListener("click", () => {
+                AudioEffects.playClick();
+                endRoom();
+            });
+        }
+
+        // Bind reset / end / leave buttons by query selector for dynamic classes (e.g. inside overlays)
+        document.querySelectorAll(".btn-reset-to-lobby").forEach(btn => {
+            btn.addEventListener("click", () => {
+                AudioEffects.playClick();
+                resetGame();
+            });
+        });
+        document.querySelectorAll(".btn-end-room-action").forEach(btn => {
+            btn.addEventListener("click", () => {
+                AudioEffects.playClick();
+                endRoom();
+            });
+        });
+        document.querySelectorAll(".btn-leave-room-action").forEach(btn => {
+            btn.addEventListener("click", () => {
+                AudioEffects.playClick();
+                leaveRoom();
+            });
+        });
+
+        // Bind reconnect button click
+        const btnReconnect = document.getElementById("btn-reconnect");
+        if (btnReconnect) {
+            btnReconnect.addEventListener("click", async () => {
+                AudioEffects.playClick();
+                btnReconnect.innerHTML = `<span class="reconnect-icon spinner-small">🔄</span> Connecting...`;
+                try {
+                    const data = await apiCall("poll");
+                    renderRoomState(data);
+                    setConnectedState(true);
+                    startPolling();
+                } catch (err) {
+                    setConnectedState(false);
+                    alert("Failed to reconnect: " + err.message);
+                }
+            });
+        }
+        // Bind Screen Display settings mode buttons
+        const btnFlipTilt = document.getElementById("btn-flip-tilt");
+        const btnFlipList = document.getElementById("btn-flip-list");
+        if (btnFlipTilt && btnFlipList) {
+            btnFlipTilt.addEventListener("click", () => {
+                AudioEffects.playClick();
+                updateSettings(assignmentMode, "tilt");
+            });
+            btnFlipList.addEventListener("click", () => {
+                AudioEffects.playClick();
+                updateSettings(assignmentMode, "list");
+            });
+        }
+
+        // Bind swipe gesture events on the gameplay reveal modal
+        const swipeModal = document.getElementById("gameplay-reveal-modal");
+        if (swipeModal) {
+            swipeModal.addEventListener("touchstart", (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            });
+
+            swipeModal.addEventListener("touchend", (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipeGesture();
+            });
+
+            swipeModal.addEventListener("click", () => {
+                AudioEffects.playClick();
+                closeRevealModal();
+            });
+        }
+
+        const modalImage = document.getElementById("reveal-modal-image");
+        if (modalImage) {
+            modalImage.addEventListener("click", (e) => {
+                e.stopPropagation();
+                AudioEffects.playClick();
+                closeRevealModal();
+            });
+        }
     }
 
     // ==========================================================================
@@ -430,10 +537,13 @@ const App = (() => {
     }
 
     // Update settings (Host only)
-    async function updateSettings(mode) {
+    async function updateSettings(mode, flipMode) {
         if (!isHost) return;
         try {
-            const data = await apiCall("update_settings", { assignmentMode: mode });
+            const data = await apiCall("update_settings", { 
+                assignmentMode: mode || assignmentMode,
+                flippingMode: flipMode || flippingMode
+            });
             renderRoomState(data);
         } catch (err) {
             alert(err.message);
@@ -444,13 +554,9 @@ const App = (() => {
     async function startGame() {
         if (!isHost) return;
         const themeVal = el.themeInput.value.trim() || "Any Character";
-        const googleApiKey = el.googleApiKeyInput.value.trim();
-        const googleCx = el.googleCxInput.value.trim();
         try {
             await apiCall("start_game", { 
-                theme: themeVal,
-                googleApiKey: googleApiKey,
-                googleCx: googleCx
+                theme: themeVal
             });
             AudioEffects.playStart();
         } catch (err) {
@@ -505,6 +611,25 @@ const App = (() => {
             location.reload();
         } catch (err) {
             alert("Failed to end room: " + err.message);
+        }
+    }
+
+    // Leave Room (Guest only)
+    async function leaveRoom() {
+        if (isHost) return;
+        if (!confirm("Are you sure you want to leave this room?")) {
+            return;
+        }
+        
+        try {
+            await apiCall("leave_room");
+            // Clear local session storage
+            sessionStorage.clear();
+            stopPolling();
+            // Reload back to landing page
+            location.reload();
+        } catch (err) {
+            alert("Failed to leave room: " + err.message);
         }
     }
 
@@ -610,17 +735,42 @@ const App = (() => {
         }
     }
 
+    // Update connected state/visibility of Reconnect button
+    function setConnectedState(connected) {
+        isConnected = connected;
+        const btn = document.getElementById("btn-reconnect");
+        if (!btn) return;
+        
+        if (roomId && playerId) {
+            btn.style.display = "flex";
+        } else {
+            btn.style.display = "none";
+            return;
+        }
+
+        if (connected) {
+            btn.classList.remove("disconnected");
+            btn.innerHTML = `<span class="reconnect-icon">🔄</span> Refresh`;
+        } else {
+            btn.classList.add("disconnected");
+            btn.innerHTML = `<span class="reconnect-icon">⚠️</span> Reconnect`;
+        }
+    }
+
     async function poll() {
         try {
             const data = await apiCall("poll");
             renderRoomState(data);
+            setConnectedState(true);
         } catch (err) {
-            // If they got kicked or room closed, clear storage and redirect
+            # If they got kicked or room closed, clear storage and redirect
             if (err.message.includes("Player not in room") || err.message.includes("Room not found")) {
                 stopPolling();
                 sessionStorage.clear();
                 alert("You are no longer in the room.");
                 location.reload();
+            } else {
+                setConnectedState(false);
             }
         }
     }
@@ -629,12 +779,12 @@ const App = (() => {
     // STATE RENDERING PIPELINE
     // ==========================================================================
     function renderRoomState(room) {
+        setConnectedState(true);
         gameState = room.state;
         theme = room.theme;
         assignmentMode = room.assignmentMode;
+        flippingMode = room.flippingMode || "tilt";
         players = room.players;
-        googleApiKey = room.googleApiKey || "";
-        googleCx = room.googleCx || "";
         
         // Verify host status matches server
         isHost = (room.hostId === playerId);
@@ -642,6 +792,24 @@ const App = (() => {
         el.playerWaiting.style.display = isHost ? "none" : "block";
         el.hostResultsControls.style.display = isHost ? "block" : "none";
         el.playerResultsWaiting.style.display = isHost ? "none" : "block";
+
+        // Update host/guest setup controls visibility
+        const hostSetup = document.getElementById("host-setup-controls");
+        const guestSetup = document.getElementById("guest-setup-controls");
+        if (hostSetup) hostSetup.style.display = isHost ? "flex" : "none";
+        if (guestSetup) guestSetup.style.display = isHost ? "none" : "block";
+
+        // Update host gameplay active controls visibility
+        const hostGameplay = document.getElementById("host-gameplay-active-controls");
+        if (hostGameplay) hostGameplay.style.display = isHost ? "flex" : "none";
+
+        // Handle generic class host/guest toggling across other container scopes
+        document.querySelectorAll(".host-only").forEach(el => {
+            el.style.display = isHost ? "flex" : "none";
+        });
+        document.querySelectorAll(".guest-only").forEach(el => {
+            el.style.display = isHost ? "none" : "block";
+        });
 
         const playerList = Object.values(players);
         
@@ -684,6 +852,22 @@ const App = (() => {
                 el.btnModeRandom.classList.remove("active");
                 el.btnModeCurated.classList.add("active");
                 el.modeDesc.textContent = "🎯 Curated Mode: You choose who you are picking a character for. Direct curated assignments.";
+            }
+
+            // Render active flipping mode settings
+            const btnFlipTilt = document.getElementById("btn-flip-tilt");
+            const btnFlipList = document.getElementById("btn-flip-list");
+            const flipDesc = document.getElementById("flip-desc");
+            if (btnFlipTilt && btnFlipList && flipDesc) {
+                if (flippingMode === "tilt") {
+                    btnFlipTilt.classList.add("active");
+                    btnFlipList.classList.remove("active");
+                    flipDesc.textContent = "📱 Tilt Screen: Tilt screen away to show your character, or tilt back to guess. (Requires gyroscope/HTTPS).";
+                } else {
+                    btnFlipTilt.classList.remove("active");
+                    btnFlipList.classList.add("active");
+                    flipDesc.textContent = "📋 No Flipping: A player list will be shown during play. Tap any name to view their character.";
+                }
             }
 
             // Render Player List
@@ -765,7 +949,7 @@ const App = (() => {
                 const previousSelect = el.selectTargetPlayer.value;
                 el.selectTargetPlayer.innerHTML = "";
                 
-                // Add a default option
+                # Add a default option
                 const defaultOpt = document.createElement("option");
                 defaultOpt.value = "";
                 defaultOpt.textContent = "-- Select Opponent --";
@@ -827,13 +1011,63 @@ const App = (() => {
             el.gameplayCharacterImage.src = myState.assignedCharacterImage || "https://robohash.org/unknown?set=set4";
             el.gameplayPlayerName.textContent = playerName;
 
+            const isListMode = (flippingMode === "list");
+            const hasFinished = (myState.status === "guessed" || myState.status === "gave_up" || myState.status === "quit");
+
+            // Hide/show manual toggle, phone icon tip, and list container based on flipping mode
+            const phoneTip = document.querySelector(".phone-tip");
+            if (phoneTip) {
+                phoneTip.style.display = (isListMode || hasFinished) ? "none" : "block";
+            }
+            
+            const listContainerSection = document.getElementById("gameplay-list-view");
+            if (listContainerSection) {
+                listContainerSection.style.display = (isListMode && !hasFinished) ? "block" : "none";
+            }
+
             // Start accelerometer orientation listener once
-            if (!deviceOrientationActive) {
-                requestOrientationSensor();
+            if (!isListMode) {
+                if (!deviceOrientationActive) {
+                    requestOrientationSensor();
+                }
+            } else {
+                stopOrientationSensor();
+            }
+
+            // Render other players list if in list mode
+            if (isListMode && !hasFinished) {
+                const listContainer = document.getElementById("gameplay-player-list-container");
+                if (listContainer) {
+                    listContainer.innerHTML = "";
+                    const list = getOtherPlayersList();
+                    
+                    if (list.length === 0) {
+                        listContainer.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">No other players in room.</p>`;
+                    } else {
+                        list.forEach(p => {
+                            const btn = document.createElement("button");
+                            btn.className = "btn outline w-100";
+                            btn.style.textAlign = "left";
+                            btn.style.display = "flex";
+                            btn.style.justifyContent = "space-between";
+                            btn.style.alignItems = "center";
+                            btn.style.marginTop = "8px";
+                            btn.innerHTML = `
+                                <span>👤 ${p.name}</span>
+                                <span style="font-size: 0.8rem; color: var(--accent);">📋 View Character</span>
+                            `;
+                            btn.addEventListener("click", () => {
+                                AudioEffects.playClick();
+                                openRevealModal(p.id);
+                            });
+                            listContainer.appendChild(btn);
+                        });
+                    }
+                }
             }
 
             // Check if player has already finished guessing
-            if (myState.status === "guessed" || myState.status === "gave_up" || myState.status === "quit") {
+            if (hasFinished) {
                 // If they finished, lock them in the Tilted Back view so they can see confirmation / wait for others
                 setGameplayView("back");
                 // Disable float override button so they don't flip back to showing
@@ -851,7 +1085,7 @@ const App = (() => {
                 // Reset active controls, hide finished overlay
                 document.getElementById("gameplay-active-controls").style.display = "block";
                 document.getElementById("gameplay-finished-controls").style.display = "none";
-                el.btnManualTiltToggle.style.display = "block";
+                el.btnManualTiltToggle.style.display = isListMode ? "none" : "block";
             }
         }
 
@@ -940,35 +1174,9 @@ const App = (() => {
             </div>
         `;
         
-        // Option A: Use Google Custom Search if configured
-        if (googleApiKey && googleCx) {
-            try {
-                const googleSearchUrl = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(googleApiKey)}&cx=${encodeURIComponent(googleCx)}&q=${encodeURIComponent(query)}&searchType=image&num=10`;
-                const res = await fetch(googleSearchUrl).then(r => r.ok ? r.json() : null).catch(() => null);
-                
-                const items = [];
-                if (res && res.items) {
-                    res.items.forEach(item => {
-                        items.push({
-                            title: item.title,
-                            description: item.snippet || "Google Image",
-                            image: item.link,
-                            thumbnail: item.link
-                        });
-                    });
-                }
-                
-                displaySearchResults(items, "No Google Image results found. Try another search or paste an image URL manually!");
-            } catch (err) {
-                console.error("Google Search failed:", err);
-                el.searchResultsContainer.innerHTML = `<div class="search-placeholder">Google Search failed. Check API credentials or internet connection.</div>`;
-            }
-            return;
-        }
-
-        // Option B: Fallback to Wikipedia, Wikimedia Commons, and Openverse (Flickr / CC)
+        # Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
         try {
-            // Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
+            # Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
             const searchUrl1 = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=12&format=json&origin=*`;
             const searchUrl2 = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + " character")}&srlimit=12&format=json&origin=*`;
             const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=30&prop=imageinfo&iiprop=url&iiurlwidth=300&format=json&origin=*`;
@@ -1118,7 +1326,7 @@ const App = (() => {
                     
                     let score = 0;
                     
-                    // Exact subject match
+                    # Exact subject match
                     if (subNorm === qNorm) {
                         score += 150;
                     } else if (subNorm.startsWith(qNorm) || qNorm.startsWith(subNorm)) {
@@ -1129,7 +1337,7 @@ const App = (() => {
                         score += 60;
                     }
                     
-                    // Token-weighting for multi-word franchise queries
+                    # Token-weighting for multi-word franchise queries
                     if (qTokens.length > 1) {
                         let tokenScore = 0;
                         qTokens.forEach((token, index) => {
@@ -1144,7 +1352,7 @@ const App = (() => {
                             }
                         });
                         
-                        // Only add token overlap boost if it matches the first or last query token (actual character name indicator)
+                        # Only add token overlap boost if it matches the first or last query token (actual character name indicator)
                         const hasLastToken = tTokens.includes(qTokens[qTokens.length - 1]);
                         const hasFirstToken = tTokens.includes(qTokens[0]);
                         if (hasLastToken || hasFirstToken) {
@@ -1152,12 +1360,12 @@ const App = (() => {
                         }
                     }
                     
-                    // Boost actual character pages
+                    # Boost actual character pages
                     if (titleLower.includes("(character)") || titleLower.includes("character")) {
                         score += 15;
                     }
                     
-                    // Deprioritize disambiguation pages or list pages
+                    # Deprioritize disambiguation pages or list pages
                     if (titleLower.includes("disambiguation") || titleLower.includes("list of")) {
                         score -= 50;
                     }
@@ -1202,13 +1410,13 @@ const App = (() => {
             card.onclick = () => {
                 AudioEffects.playClick();
                 
-                // Handle highlight toggle
+                # Handle highlight toggle
                 document.querySelectorAll(".search-item-card").forEach(c => c.classList.remove("selected"));
                 card.classList.add("selected");
                 
                 selectedCharacter = {
                     name: item.title,
-                    image: item.image // Use high-res image for submission
+                    image: item.image # Use high-res image for submission
                 };
                 
                 // Show in submit preview
@@ -1358,10 +1566,93 @@ const App = (() => {
         }
     }
 
+    // Helper to get list of other players
+    function getOtherPlayersList() {
+        return Object.values(players)
+            .filter(p => p.id !== playerId)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    let currentRevealPlayerId = null;
+
+    // Helper to open player reveal modal
+    function openRevealModal(targetPlayerId) {
+        const targetPlayer = players[targetPlayerId];
+        if (!targetPlayer) return;
+        
+        currentRevealPlayerId = targetPlayerId;
+        
+        const modal = document.getElementById("gameplay-reveal-modal");
+        const modalImg = document.getElementById("reveal-modal-image");
+        const modalName = document.getElementById("reveal-modal-name");
+        const modalDesc = document.getElementById("reveal-modal-player-desc");
+        
+        if (modalDesc) modalDesc.textContent = `${targetPlayer.name} is guessing:`;
+        if (modalImg) modalImg.src = targetPlayer.assignedCharacterImage || "https://robohash.org/unknown?set=set4";
+        if (modalName) modalName.textContent = targetPlayer.assignedCharacterName || "???";
+        
+        if (modal) modal.style.display = "flex";
+    }
+
+    // Helper to close player reveal modal
+    function closeRevealModal() {
+        const modal = document.getElementById("gameplay-reveal-modal");
+        if (modal) modal.style.display = "none";
+        currentRevealPlayerId = null;
+    }
+
+    // Swipe gesture detection variables
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    function handleSwipeGesture() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const minSwipeDistance = 30; // Min pixels to trigger swipe
+        
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // Horizontal swipe
+            if (Math.abs(deltaX) > minSwipeDistance) {
+                if (deltaX < 0) {
+                    navigateRevealPlayer(1);
+                } else {
+                    navigateRevealPlayer(-1);
+                }
+            }
+        } else {
+            // Vertical swipe
+            if (Math.abs(deltaY) > minSwipeDistance) {
+                if (deltaY < 0) {
+                    navigateRevealPlayer(1);
+                } else {
+                    navigateRevealPlayer(-1);
+                }
+            }
+        }
+    }
+
+    // Helper to navigate between revealed players via swipe
+    function navigateRevealPlayer(direction) {
+        const list = getOtherPlayersList();
+        if (list.length === 0) return;
+        
+        let index = list.findIndex(p => p.id === currentRevealPlayerId);
+        if (index === -1) {
+            index = 0;
+        } else {
+            index = (index + direction + list.length) % list.length;
+        }
+        
+        openRevealModal(list[index].id);
+    }
+
     // Expose entrypoint
     return {
         init
     };
+    
 })();
 
 // Launch application on page load

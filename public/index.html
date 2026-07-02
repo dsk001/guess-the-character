@@ -8,10 +8,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
     <div id="app" class="app-container">
+        <!-- Floating Reconnect Button -->
+        <button id="btn-reconnect" class="btn-floating-reconnect" style="display: none;">
+            <span class="reconnect-icon">🔄</span> Refresh
+        </button>
         
         <!-- ================= WELCOME SCREEN ================= -->
         <section id="screen-welcome" class="screen active">
@@ -51,7 +55,7 @@
                 </div>
             </div>
         </section>
-
+ 
         <!-- ================= LOBBY SCREEN ================= -->
         <section id="screen-lobby" class="screen">
             <div class="header-bar">
@@ -64,7 +68,7 @@
                 </button>
                 <div class="badge" id="lobby-status-badge">Lobby</div>
             </div>
-
+ 
             <div class="lobby-layout">
                 <!-- Left panel: QR code and Host Settings -->
                 <div class="lobby-control card glass">
@@ -85,43 +89,39 @@
                             </div>
                             <p class="setting-desc" id="mode-desc">Players submit any character, and they are assigned randomly among everyone (no one gets their own).</p>
                         </div>
-
+ 
+                        <div class="input-group" style="margin-top: 15px;">
+                            <label>Screen Display Mode</label>
+                            <div class="toggle-group">
+                                <button id="btn-flip-tilt" class="toggle-btn active" data-mode="tilt">
+                                    <span class="mode-icon">📱</span> Tilt Screen
+                                </button>
+                                <button id="btn-flip-list" class="toggle-btn" data-mode="list">
+                                    <span class="mode-icon">📋</span> No Flipping
+                                </button>
+                            </div>
+                            <p class="setting-desc" id="flip-desc">Tilt screen away to show your character, or tilt back to guess.</p>
+                        </div>
+ 
                         <div class="input-group">
                             <label for="theme-input">Game Theme (Sentence Hint)</label>
                             <input type="text" id="theme-input" placeholder="e.g. Disney Characters, Marvel Heroes, Cartoon Characters" maxlength="50" autocomplete="off">
                         </div>
-
-                        <!-- Google Custom Search Configuration (Optional) -->
-                        <div class="input-group" style="margin-top: 15px; display: flex; flex-direction: column; width: 100%;">
-                            <button type="button" id="btn-toggle-api-settings" class="btn text" style="font-size: 0.8rem; padding: 4px 8px; width: auto; min-width: 0; align-self: flex-start; text-decoration: underline; color: var(--accent);">
-                                🔧 Google Image Search Settings (Optional)
-                            </button>
-                            <div id="api-settings-panel" style="display: none; margin-top: 10px; border: 1px solid var(--border-light); padding: 12px; border-radius: 8px; background: rgba(0,0,0,0.15); flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
-                                <p style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.35;">
-                                    Optionally configure a Google Custom Search JSON API Key and Search Engine ID (CX) to enable Google Image Search. Leave empty to fallback to Wikipedia/Commons search.
-                                </p>
-                                <div class="input-group" style="margin-bottom: 0;">
-                                    <label for="google-api-key" style="font-size: 0.75rem;">Google API Key</label>
-                                    <input type="text" id="google-api-key" placeholder="AIzaSy..." style="font-size: 0.8rem; padding: 6px 10px; width: 100%; box-sizing: border-box;" autocomplete="off">
-                                </div>
-                                <div class="input-group" style="margin-bottom: 0;">
-                                    <label for="google-cx" style="font-size: 0.75rem;">Search Engine ID (CX)</label>
-                                    <input type="text" id="google-cx" placeholder="e.g. b123456789abcde" style="font-size: 0.8rem; padding: 6px 10px; width: 100%; box-sizing: border-box;" autocomplete="off">
-                                </div>
-                            </div>
-                        </div>
-
+ 
+ 
+ 
                         <button id="btn-start-game" class="btn primary w-100" disabled>Start Game (Need 2+ Players)</button>
                         <button id="btn-join-instead" class="btn secondary w-100" style="margin-top: 12px;">🔄 Join a Room Instead</button>
                         <button id="btn-end-room" class="btn danger outline w-100" style="margin-top: 12px;">❌ End & Leave Room</button>
                     </div>
-
+ 
                     <div id="player-waiting" class="player-only-waiting">
                         <div class="spinner"></div>
                         <p>Waiting for the host to start the game...</p>
+                        <button id="btn-leave-lobby" class="btn outline w-100" style="margin-top: 20px;">❌ Leave Room</button>
                     </div>
                 </div>
-
+ 
                 <!-- Right panel: Player List -->
                 <div class="lobby-players card glass">
                     <h3 class="section-title">Players (<span id="player-count">0</span>)</h3>
@@ -131,7 +131,7 @@
                 </div>
             </div>
         </section>
-
+ 
         <!-- ================= SETUP / CHARACTER SELECTION SCREEN ================= -->
         <section id="screen-setup" class="screen">
             <div class="header-bar">
@@ -140,13 +140,13 @@
                     <h2 id="setup-theme-display">---</h2>
                 </div>
             </div>
-
+ 
             <div class="setup-container card glass">
                 <div class="setup-header">
                     <h3>Pick a Character</h3>
                     <p id="setup-instruction-desc">Find a picture of a character for the game.</p>
                 </div>
-
+ 
                 <!-- Curated target selection if mode is curated -->
                 <div id="curated-target-container" class="input-group" style="display: none;">
                     <label for="select-target-player">Who are you choosing a character for?</label>
@@ -154,20 +154,20 @@
                         <!-- Loaded dynamically -->
                     </select>
                 </div>
-
+ 
                 <!-- Search Input -->
                 <div class="search-box">
                     <input type="text" id="character-search-input" placeholder="Search character (e.g. Batman, Mickey Mouse)" autocomplete="off">
                     <button id="btn-search-character" class="btn primary">Search</button>
                 </div>
-
+ 
                 <!-- Search Results -->
                 <div id="search-results-container" class="search-results-grid">
                     <div class="search-placeholder">
                         Type a character name above and click search
                     </div>
                 </div>
-
+ 
                 <!-- Custom Input Fallback / Manual Image Link -->
                 <div class="custom-fallback-toggle">
                     <button id="btn-toggle-custom-image" class="btn text">Or paste image URL / enter manually</button>
@@ -183,7 +183,7 @@
                     </div>
                     <button id="btn-submit-custom" class="btn secondary">Confirm Manual Entry</button>
                 </div>
-
+ 
                 <!-- Selected preview and submission -->
                 <div id="selected-character-preview" class="preview-card" style="display: none;">
                     <h4 class="preview-title">Selected Character</h4>
@@ -193,7 +193,7 @@
                     </div>
                     <button id="btn-submit-character" class="btn success w-100">Submit Character</button>
                 </div>
-
+ 
                 <!-- Waiting state overlay -->
                 <div id="setup-waiting-overlay" class="waiting-overlay" style="display: none;">
                     <div class="spinner"></div>
@@ -202,10 +202,31 @@
                         <h4>Submissions (<span id="submitted-count">0/0</span>):</h4>
                         <ul id="submitted-players-ul"></ul>
                     </div>
+                    <!-- Setup waiting action buttons -->
+                    <div class="setup-actions" style="margin-top: 20px; width: 100%; display: flex; flex-direction: column; gap: 10px;">
+                        <div class="host-only" style="display: none; flex-direction: column; gap: 10px; width: 100%;">
+                            <button class="btn-reset-to-lobby btn secondary w-100">🔄 Reset to Lobby</button>
+                            <button class="btn-end-room-action btn danger outline w-100">❌ End & Leave Room</button>
+                        </div>
+                        <div class="guest-only" style="display: none; width: 100%;">
+                            <button class="btn-leave-room-action btn outline w-100">❌ Leave Room</button>
+                        </div>
+                    </div>
+                </div>
+ 
+                <!-- Setup screen footer action buttons -->
+                <div class="setup-actions" style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 15px; width: 100%; display: flex; flex-direction: column; gap: 10px;">
+                    <div id="host-setup-controls" style="display: none; flex-direction: column; gap: 10px; width: 100%;">
+                        <button id="btn-reset-setup" class="btn secondary w-100">🔄 Reset to Lobby</button>
+                        <button id="btn-end-setup" class="btn danger outline w-100">❌ End & Leave Room</button>
+                    </div>
+                    <div id="guest-setup-controls" style="display: none; width: 100%;">
+                        <button id="btn-leave-setup" class="btn outline w-100">❌ Leave Room</button>
+                    </div>
                 </div>
             </div>
         </section>
-
+ 
         <!-- ================= GAMEPLAY SCREEN ================= -->
         <section id="screen-gameplay" class="screen">
             
@@ -220,7 +241,7 @@
                     <div class="countdown-number" id="away-countdown-text">3</div>
                     <p class="countdown-tip">Turn your screen to face other players!</p>
                 </div>
-
+ 
                 <!-- Character Display Card -->
                 <div id="gameplay-character-details" class="character-display-card" style="width: 100%;">
                     <div class="character-img-wrapper">
@@ -233,7 +254,7 @@
                     Show this screen to other players!
                 </div>
             </div>
-
+ 
             <!-- 2. GAMEPLAY MENU STATE: TILTED BACK (Facing player) -->
             <div id="view-tilted-back" class="gameplay-view active">
                 <!-- Active Guessing Controls -->
@@ -263,9 +284,21 @@
                                 <span class="btn-icon">❌</span> Quit Game
                             </button>
                         </div>
+                        <!-- Host-only gameplay active controls -->
+                        <div id="host-gameplay-active-controls" style="display: none; flex-direction: column; gap: 10px; margin-top: 12px; width: 100%; border-top: 1px solid var(--border-light); padding-top: 12px;">
+                            <button class="btn-reset-to-lobby btn secondary w-100">🔄 Reset to Lobby</button>
+                            <button class="btn-end-room-action btn danger outline w-100">❌ End & Leave Room</button>
+                        </div>
+                        <!-- Player List View (No Flipping Mode) -->
+                        <div id="gameplay-list-view" style="display: none; width: 100%; margin-top: 15px; border-top: 1px solid var(--border-light); padding-top: 15px;">
+                            <h3 class="section-title" style="margin-bottom: 12px; font-size: 1rem;">View Other Players</h3>
+                            <div id="gameplay-player-list-container" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                                <!-- Dynamically filled with player buttons -->
+                            </div>
+                        </div>
                     </div>
                 </div>
-
+ 
                 <!-- Finished/Waiting Overlay -->
                 <div id="gameplay-finished-controls" style="display: none; width: 100%;">
                     <div class="gameplay-status-header">
@@ -273,20 +306,30 @@
                         <p class="game-instruction">You were: <strong id="gameplay-reveal-name" class="highlight">---</strong></p>
                     </div>
                     <div class="card glass text-center" style="padding: 24px; display: flex; flex-direction: column; align-items: center;">
-                        <img id="gameplay-reveal-image" src="" style="width: 140px; height: 140px; object-fit: cover; border-radius: 12px; border: 2px solid var(--border-color); margin-bottom: 15px; display: block;">
+                        <img id="gameplay-reveal-image" class="round-reveal-img" src="" style="object-fit: contain; border-radius: 12px; border: 2px solid var(--border-color); margin-bottom: 15px; display: block; background-color: rgba(0,0,0,0.25);">
                         <p id="gameplay-finished-message" style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 20px; text-align: center;"></p>
                         <div class="spinner"></div>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">Waiting for other players to finish...</p>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-bottom: 15px;">Waiting for other players to finish...</p>
+                        <!-- Gameplay finished action buttons -->
+                        <div class="gameplay-finished-actions" style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
+                            <div class="host-only" style="display: none; flex-direction: column; gap: 10px; width: 100%;">
+                                <button class="btn-reset-to-lobby btn secondary w-100">🔄 Reset to Lobby</button>
+                                <button class="btn-end-room-action btn danger outline w-100">❌ End & Leave Room</button>
+                            </div>
+                            <div class="guest-only" style="display: none; width: 100%;">
+                                <button class="btn-leave-room-action btn outline w-100">❌ Leave Room</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
+ 
             <!-- Floating Toggle Button for manual view switching -->
             <button id="btn-manual-tilt-toggle" class="btn toggle-view-btn">
                 🔄 Toggle Screen View
             </button>
         </section>
-
+ 
         <!-- ================= RESULTS SCREEN ================= -->
         <section id="screen-results" class="screen">
             <div class="logo-container">
@@ -294,7 +337,7 @@
                 <h1>Round Results</h1>
                 <p id="results-theme-display" class="subtitle">Theme: ---</p>
             </div>
-
+ 
             <div class="results-layout">
                 <div class="card glass results-card">
                     <h3 class="section-title">Leaderboard</h3>
@@ -302,7 +345,7 @@
                         <!-- Filled dynamically -->
                     </ol>
                 </div>
-
+ 
                 <div class="actions-card card glass">
                     <div id="host-results-controls" style="display: none;">
                         <h3 class="section-title">Host Controls</h3>
@@ -335,7 +378,7 @@
                 <button id="btn-close-qr-modal" class="btn primary w-100">Close</button>
             </div>
         </div>
-
+ 
         <!-- ================= Success Celebration Reveal Overlay ================= -->
         <div id="success-overlay" class="modal-overlay" style="display: none; z-index: 2100; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
             <div class="celebration-content text-center glass" style="animation: scaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; display: flex; flex-direction: column; align-items: center; gap: 20px; max-width: 90%; width: 360px; padding: 30px; border-radius: 24px; border: 2px solid var(--success); box-shadow: 0 0 45px rgba(46, 204, 113, 0.45);">
@@ -343,7 +386,7 @@
                 <h2 style="font-size: 2.2rem; color: var(--success); font-weight: 800; text-shadow: 0 0 15px rgba(46, 204, 113, 0.3); margin: 0; background: none; -webkit-text-fill-color: initial;">CORRECT!</h2>
                 <p style="font-size: 0.95rem; color: var(--text-secondary); margin: 0;">You guessed your character!</p>
                 
-                <div style="width: 180px; height: 180px; border-radius: 20px; overflow: hidden; border: 3px solid var(--success); box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; margin: 10px 0;">
+                <div class="success-img-wrapper" style="border-radius: 20px; overflow: hidden; border: 3px solid var(--success); box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; margin: 10px 0;">
                     <img id="success-character-image" src="" style="width: 100%; height: 100%; object-fit: contain;">
                 </div>
                 
@@ -353,11 +396,28 @@
                 <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Loading waiting room...</p>
             </div>
         </div>
+ 
+        <!-- ================= Gameplay Character Reveal Modal (No Flipping) ================= -->
+        <div id="gameplay-reveal-modal" class="modal-overlay" style="display: none; z-index: 2050; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <div class="celebration-content text-center glass" style="display: flex; flex-direction: column; align-items: center; gap: 20px; max-width: 90%; width: 360px; padding: 30px; border-radius: 24px; border: 2px solid var(--accent); box-shadow: 0 0 45px rgba(0, 240, 255, 0.3);">
+                <p id="reveal-modal-player-desc" style="font-size: 0.95rem; color: var(--text-secondary); margin: 0;"></p>
+                
+                <div class="reveal-modal-img-wrapper" style="border-radius: 20px; overflow: hidden; border: 3px solid var(--accent); box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #000; margin: 10px 0;">
+                    <img id="reveal-modal-image" src="" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+                
+                <h1 id="reveal-modal-name" style="font-size: 2.2rem; color: #fff; margin: 0; word-break: break-word; font-weight: 800; background: none; -webkit-text-fill-color: initial;">---</h1>
+                
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; text-align: center;">
+                    Tap card or swipe to flip between other players
+                </p>
+            </div>
+        </div>
         
     </div>
-
+ 
     <!-- Script references -->
-    <script src="audio.js?v=9"></script>
-    <script src="app.js?v=9"></script>
+    <script src="audio.js?v=15"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

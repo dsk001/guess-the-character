@@ -575,7 +575,7 @@ select {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    max-height: 280px;
+    max-height: 360px;
     overflow-y: auto;
     padding: 4px;
     border-radius: 12px;
@@ -616,7 +616,7 @@ select {
 
 .search-item-img {
     width: 100%;
-    height: 100px;
+    height: 135px;
     object-fit: contain; /* Changed from cover to contain to prevent cropping rectangular images */
     background-color: rgba(0,0,0,0.35); /* Dark background for transparent/contain gutters */
 }
@@ -679,8 +679,8 @@ select {
 }
 
 .preview-content img {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 75px;
     object-fit: contain; /* Changed from cover to contain to prevent cropping preview image */
     border-radius: 8px;
     border: 1px solid var(--border-color);
@@ -816,16 +816,38 @@ select {
 }
 
 .character-img-wrapper {
-    width: 45vh; /* Scale with height to fit horizontal/landscape orientations */
-    height: 45vh;
-    max-width: 320px;
-    max-height: 320px;
-    border-radius: 20px;
+    width: min(80vw, 48vh);
+    height: calc(min(80vw, 48vh) * 1.5);
+    max-width: 400px;
+    max-height: 600px;
+    border-radius: 24px;
     overflow: hidden;
     border: 4px solid #fff;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 10px 45px rgba(0, 240, 255, 0.45);
     margin-bottom: 3vh;
-    background-color: #222;
+    background-color: #111;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.reveal-modal-img-wrapper {
+    width: min(75vw, 42vh);
+    height: calc(min(75vw, 42vh) * 1.5);
+    max-width: 320px;
+    max-height: 480px;
+}
+
+.success-img-wrapper {
+    width: min(75vw, 42vh);
+    height: calc(min(75vw, 42vh) * 1.5);
+    max-width: 320px;
+    max-height: 480px;
+}
+
+.round-reveal-img {
+    width: min(60vw, 36vh);
+    height: calc(min(60vw, 36vh) * 1.5);
+    max-width: 240px;
+    max-height: 360px;
 }
 
 .character-img-wrapper img {
@@ -862,10 +884,10 @@ select {
     }
     
     .character-img-wrapper {
-        width: 60vh;
-        height: 60vh;
-        max-width: 250px;
-        max-height: 250px;
+        width: min(35vw, 55vh);
+        height: calc(min(35vw, 55vh) * 1.5);
+        max-width: 300px;
+        max-height: 450px;
         margin-bottom: 0;
     }
     
@@ -1244,5 +1266,61 @@ select {
     }
     50% {
         transform: translateY(-10px);
+    }
+}
+
+/* Floating Reconnect Button */
+.btn-floating-reconnect {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all var(--transition-fast);
+}
+
+.btn-floating-reconnect:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.btn-floating-reconnect:active {
+    transform: translateY(1px);
+}
+
+.btn-floating-reconnect.disconnected {
+    background: rgba(231, 76, 60, 0.25);
+    border-color: rgba(231, 76, 60, 0.45);
+    color: var(--danger);
+    animation: reconnect-pulse 2s infinite;
+}
+
+.spinner-small {
+    display: inline-block;
+    animation: spin 1s infinite linear;
+}
+
+@keyframes reconnect-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
     }
 }
