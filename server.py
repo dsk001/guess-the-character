@@ -47,6 +47,15 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Serve from 'public' folder
         super().__init__(*args, directory=os.path.join(os.path.dirname(__file__), "public"), **kwargs)
 
+    def end_headers(self):
+        # Prevent caching of HTML files so clients always get the latest layout and script versions
+        normalized_path = self.path.split('?')[0].split('#')[0]
+        if normalized_path in ["", "/", "/index.html"] or normalized_path.endswith(".html"):
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+        super().end_headers()
+
     def log_message(self, format, *args):
         # Suppress noisy HTTP requests logs, only print errors or manual logs
         pass
