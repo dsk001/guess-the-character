@@ -728,53 +728,6 @@ const App = (() => {
         pollInterval = setInterval(poll, 1000);
     }
 
-    function stopPolling() {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-        }
-    }
-
-    // Update connected state/visibility of Reconnect button
-    function setConnectedState(connected) {
-        isConnected = connected;
-        const btn = document.getElementById("btn-reconnect");
-        if (!btn) return;
-        
-        if (roomId && playerId) {
-            btn.style.display = "flex";
-        } else {
-            btn.style.display = "none";
-            return;
-        }
-
-        if (connected) {
-            btn.classList.remove("disconnected");
-            btn.innerHTML = `<span class="reconnect-icon">🔄</span> Refresh`;
-        } else {
-            btn.classList.add("disconnected");
-            btn.innerHTML = `<span class="reconnect-icon">⚠️</span> Reconnect`;
-        }
-    }
-
-    async function poll() {
-        try {
-            const data = await apiCall("poll");
-            renderRoomState(data);
-            setConnectedState(true);
-        } catch (err) {
-            # If they got kicked or room closed, clear storage and redirect
-            if (err.message.includes("Player not in room") || err.message.includes("Room not found")) {
-                stopPolling();
-                sessionStorage.clear();
-                alert("You are no longer in the room.");
-                location.reload();
-            } else {
-                setConnectedState(false);
-            }
-        }
-    }
-
     // ==========================================================================
     // STATE RENDERING PIPELINE
     // ==========================================================================
@@ -949,7 +902,7 @@ const App = (() => {
                 const previousSelect = el.selectTargetPlayer.value;
                 el.selectTargetPlayer.innerHTML = "";
                 
-                # Add a default option
+                // Add a default option
                 const defaultOpt = document.createElement("option");
                 defaultOpt.value = "";
                 defaultOpt.textContent = "-- Select Opponent --";
@@ -1158,9 +1111,6 @@ const App = (() => {
     }
 
     // ==========================================================================
-    // WIKIPEDIA IMAGE SEARCH CLIENT
-    // ==========================================================================
-    // ==========================================================================
     // IMAGE SEARCH CLIENT (GOOGLE CUSTOM SEARCH OR WIKIPEDIA FALLBACK)
     // ==========================================================================
     async function searchCharacters() {
@@ -1174,9 +1124,9 @@ const App = (() => {
             </div>
         `;
         
-        # Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
+        // Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
         try {
-            # Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
+            // Query Wikipedia, Commons, Openverse, and server DDG proxy in parallel
             const searchUrl1 = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=12&format=json&origin=*`;
             const searchUrl2 = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + " character")}&srlimit=12&format=json&origin=*`;
             const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=30&prop=imageinfo&iiprop=url&iiurlwidth=300&format=json&origin=*`;
@@ -1326,7 +1276,7 @@ const App = (() => {
                     
                     let score = 0;
                     
-                    # Exact subject match
+                    // Exact subject match
                     if (subNorm === qNorm) {
                         score += 150;
                     } else if (subNorm.startsWith(qNorm) || qNorm.startsWith(subNorm)) {
@@ -1337,7 +1287,7 @@ const App = (() => {
                         score += 60;
                     }
                     
-                    # Token-weighting for multi-word franchise queries
+                    // Token-weighting for multi-word franchise queries
                     if (qTokens.length > 1) {
                         let tokenScore = 0;
                         qTokens.forEach((token, index) => {
@@ -1352,7 +1302,7 @@ const App = (() => {
                             }
                         });
                         
-                        # Only add token overlap boost if it matches the first or last query token (actual character name indicator)
+                        // Only add token overlap boost if it matches the first or last query token (actual character name indicator)
                         const hasLastToken = tTokens.includes(qTokens[qTokens.length - 1]);
                         const hasFirstToken = tTokens.includes(qTokens[0]);
                         if (hasLastToken || hasFirstToken) {
@@ -1360,12 +1310,12 @@ const App = (() => {
                         }
                     }
                     
-                    # Boost actual character pages
+                    // Boost actual character pages
                     if (titleLower.includes("(character)") || titleLower.includes("character")) {
                         score += 15;
                     }
                     
-                    # Deprioritize disambiguation pages or list pages
+                    // Deprioritize disambiguation pages or list pages
                     if (titleLower.includes("disambiguation") || titleLower.includes("list of")) {
                         score -= 50;
                     }
@@ -1410,13 +1360,13 @@ const App = (() => {
             card.onclick = () => {
                 AudioEffects.playClick();
                 
-                # Handle highlight toggle
+                // Handle highlight toggle
                 document.querySelectorAll(".search-item-card").forEach(c => c.classList.remove("selected"));
                 card.classList.add("selected");
                 
                 selectedCharacter = {
                     name: item.title,
-                    image: item.image # Use high-res image for submission
+                    image: item.image // Use high-res image for submission
                 };
                 
                 // Show in submit preview
@@ -1477,95 +1427,6 @@ const App = (() => {
         }
     }
 
-    function stopOrientationSensor() {
-        deviceOrientationActive = false;
-        window.removeEventListener('deviceorientation', handleOrientationTilt);
-    }
-
-    function handleOrientationTilt(event) {
-        // If the user tapped manual toggle, disable automatic changes
-        if (manualOverrideActive) return;
-
-        const beta = event.beta;   // -180 to 180 (front/back pitch)
-        const gamma = event.gamma; // -90 to 90 (left/right roll)
-
-        // Threshold detection:
-        // When pointing the screen to others (horizontal/vertical away from user's face):
-        // Portrait: phone is held vertical (beta ~ 90). If tilted forward, beta increases past 95.
-        // Landscape: phone is held sideways (gamma ~ 90 or -90).
-        
-        let isTiltedAway = false;
-        
-        // Portrait vertical/tilt away check
-        if (Math.abs(beta) > 75 && Math.abs(beta) < 115) {
-            isTiltedAway = true;
-        }
-        
-        // Landscape vertical/tilt away check
-        if (Math.abs(gamma) > 75 && Math.abs(gamma) < 115) {
-            isTiltedAway = true;
-        }
-
-        setGameplayView(isTiltedAway ? "away" : "back");
-    }
-
-    function setGameplayView(view) {
-        if (currentGameplayView === view) return; // Prevent double trigger
-        currentGameplayView = view;
-        
-        const countdownOverlay = document.getElementById("gameplay-away-countdown");
-        const charDetails = document.getElementById("gameplay-character-details");
-        const countdownText = document.getElementById("away-countdown-text");
-        
-        if (view === "away") {
-            el.viewTiltedAway.classList.add("active");
-            el.viewTiltedBack.classList.remove("active");
-            
-            // Clear any active countdown
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-            
-            // Show countdown screen, hide character card details
-            countdownOverlay.style.display = "flex";
-            charDetails.style.display = "none";
-            
-            let count = 3;
-            countdownText.textContent = count;
-            AudioEffects.playBeep(); // Beep for 3
-            
-            countdownInterval = setInterval(() => {
-                count--;
-                if (count > 0) {
-                    countdownText.textContent = count;
-                    AudioEffects.playBeep(); // Beep for 2, 1
-                } else {
-                    clearInterval(countdownInterval);
-                    countdownInterval = null;
-                    
-                    // Reveal character
-                    countdownOverlay.style.display = "none";
-                    charDetails.style.display = "block";
-                    AudioEffects.playStart(); // Triumphant chord for reveal!
-                }
-            }, 1000);
-        } else {
-            // Cancel active countdown
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-            
-            // Reset overlay visibility defaults
-            countdownOverlay.style.display = "none";
-            charDetails.style.display = "block";
-
-            el.viewTiltedAway.classList.remove("active");
-            el.viewTiltedBack.classList.add("active");
-        }
-    }
-
     // Helper to get list of other players
     function getOtherPlayersList() {
         return Object.values(players)
@@ -1598,62 +1459,3 @@ const App = (() => {
     function closeRevealModal() {
         const modal = document.getElementById("gameplay-reveal-modal");
         if (modal) modal.style.display = "none";
-        currentRevealPlayerId = null;
-    }
-
-    // Swipe gesture detection variables
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchEndX = 0;
-    let touchEndY = 0;
-
-    function handleSwipeGesture() {
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        const minSwipeDistance = 30; // Min pixels to trigger swipe
-        
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            // Horizontal swipe
-            if (Math.abs(deltaX) > minSwipeDistance) {
-                if (deltaX < 0) {
-                    navigateRevealPlayer(1);
-                } else {
-                    navigateRevealPlayer(-1);
-                }
-            }
-        } else {
-            // Vertical swipe
-            if (Math.abs(deltaY) > minSwipeDistance) {
-                if (deltaY < 0) {
-                    navigateRevealPlayer(1);
-                } else {
-                    navigateRevealPlayer(-1);
-                }
-            }
-        }
-    }
-
-    // Helper to navigate between revealed players via swipe
-    function navigateRevealPlayer(direction) {
-        const list = getOtherPlayersList();
-        if (list.length === 0) return;
-        
-        let index = list.findIndex(p => p.id === currentRevealPlayerId);
-        if (index === -1) {
-            index = 0;
-        } else {
-            index = (index + direction + list.length) % list.length;
-        }
-        
-        openRevealModal(list[index].id);
-    }
-
-    // Expose entrypoint
-    return {
-        init
-    };
-    
-})();
-
-// Launch application on page load
-window.addEventListener("DOMContentLoaded", App.init);
